@@ -7,7 +7,7 @@ from collections.abc import Callable
 from openpilot.common.time_helpers import system_time_valid
 from openpilot.selfdrive.ui.mici.layouts.settings.device import EngagedConfirmationButton
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
-from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog
+from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigInputDialog
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.lib.multilang import tr
@@ -47,7 +47,7 @@ class SoftwareInfoLayoutMici(Widget):
 
     self._branch_label = UnifiedLabel("branch", 48, max_width=max_width, font_weight=FontWeight.DISPLAY, wrap_text=False)
     self._branch_text_label = UnifiedLabel("", 32, max_width=max_width, text_color=subheader_color,
-                                           font_weight=FontWeight.ROMAN, wrap_text=False)
+                                           font_weight=FontWeight.ROMAN, wrap_text=False, scroll=True)
 
   def _update_state(self):
     desc = _split_description(ui_state.params.get("UpdaterCurrentDescription") or "")
@@ -258,6 +258,22 @@ class SoftwareLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
 
+    def switch_branch_handle_selection(new_branch: str):
+      if new_branch:
+        ui_state.params.put("UpdaterTargetBranch", new_branch, block=True)
+        subprocess.run("pkill -SIGUSR1 -f openpilot.system.updated.updated", shell=True)
+        self._scroller.scroll_panel.set_offset(-300)
+
+    def switch_branch_clicked():
+      current_branch = ui_state.params.get("GitBranch") or ""
+      dlg = BigInputDialog("enter mvl_boston/", current_branch, minimum_length=1,
+                           confirm_callback=switch_branch_handle_selection)
+      gui_app.push_widget(dlg)
+      return
+
+    switch_branch_btn = BigButton("switch branch", "", gui_app.texture("icons_mici/settings/device/update.png", 64, 64))
+    switch_branch_btn.set_click_callback(switch_branch_clicked)
+
     def uninstall_openpilot_callback():
       ui_state.params.put_bool("DoUninstall", True, block=True)
 
@@ -270,5 +286,6 @@ class SoftwareLayoutMici(NavScroller):
       CheckUpdateButton(),
       InstallUpdateButton(),
       TargetBranchButton(),
+      switch_branch_btn,
       uninstall_openpilot_btn,
     ])
